@@ -17,6 +17,12 @@ while true; do
 
   # Ping the gateway vxlan IP -> this only works when vxlan is up
   while ping -c "${CONNECTION_RETRY_COUNT}" "$VXLAN_GATEWAY_IP" > /dev/null; do
+
+    result=`python3 /bin/ok_to_end.py`
+    if [ "$result" == "True" ]; then
+      echo "Ok to end."
+      exit 0
+    fi
     # Sleep while reacting to signals
     sleep 10 &
     wait $!

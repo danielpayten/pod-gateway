@@ -1,7 +1,3 @@
-# ⚠️ Deprecation and Archive Notice
-
-**This repo is being deprecated, please use [the new repo](https://github.com/angelnu/pod-gateway) instead**
-
 # pod-gateway
 
 This container includes scripts used to route traafic from pods through another gateway pod. Typically
@@ -30,6 +26,13 @@ This container provides the required init/sidecar containers for clients and gat
    - [client_sidecar.sh](bin/client_sidecar.sh): periodically checks connection to the gateway is still
      working. Reset the vxlan if this is not the case. This happens, for example, when the gateway POD
      is restarted and it gets a new IP from K8S.
+     This also now checks to see whether all other containers have completed. In the event that the sidecar
+     is the only remaining container running, it will shutdown. This check is completed using [ok_to_end.py].
+     However, for this to run, we require additional permissions from kube. Namely, those specified in the 
+     SetupEnv.yaml
+     
+     
+     
 - gateway POD:
    - [gateway_init.sh](bin/gateway_init.sh): creates the VXLAN tunnel and set traffic forwading rules.
      Optionally, if a VPN is used in the gateway, blocks non VPN outbound traffic.
