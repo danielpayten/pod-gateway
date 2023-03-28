@@ -1,64 +1,27 @@
-# pod-gateway
+# (danielpayten) pod-gateway: Automatic Completion Fork 
 
-This container includes scripts used to route traafic from pods through another gateway pod. Typically
-the gateway pod then runs a openvpn client to forward the traffic.
+This project is a fork of k8s-at-home pod gateway here: https://github.com/k8s-at-home/pod-gateway/
 
-This container is typically used by the [pod-gateway]()
+This project can be deployed on kubernetes, allowing all container in a designated namespace to route their traffic via a VPN.
+This is acheived through running a sidecar container alongside the workload(s).
+While the initial project did work, it was unsuitable for my needs as jobs would never be marked as complete as the sidecar container remained running despite the workload container completing.
 
-The connection between the pods is done via a vxlan. The gatway provides a DHCP server to let client
-pods to get automatically an IP.
+This for adds a 'heartbeat' type check, which terminates the sidecar container if it is the last remaining container running in the pod.
 
-Ougoing traffic is masqueraded (SNAT). It is also possible to define port forwardind so ports of client
-pods can be reached from the outside.
+This is acheived through a small piece of python code [ok_to_end.py](https://github.com/danielpayten/pod-gateway/blob/main/bin/ok_to_end.py) which uses the kubernetes API to check the state of all other remaining containers in the pod.
 
-The [.github](.github) folder will get PRs from this template so you can apply the latest workflows.
+The heartbeat [client_sidecar.sh](https://github.com/danielpayten/pod-gateway/blob/main/bin/client_sidecar.sh) shell script was modified to complete these checks.
 
-## Design
+Additionally, because we're using the Kubernetes API to check the state of other containers in the pod, we need to apply appropriate RBAC.
+An example of this is contained in https://github.com/danielpayten/pod-gateway/blob/main/SetupEnv.yaml
 
-Client PODs are connected through a tunnel to the gateway POD and route default traffic and DNS queries
-through it. The tunnel is implemented as VXLAN overlay.
+## Usage
 
-This container provides the required init/sidecar containers for clients and gateway PODs:
-- client PODs connecting through gateway POD:
-   - [client_init.sh](bin/client_init.sh): starts the VXLAN tunnel and change the default gateway
-     in the POD. It can get its IP via DHCP or use an static IP within the VXLAN (needed for port)
-     forwarding.
-   - [client_sidecar.sh](bin/client_sidecar.sh): periodically checks connection to the gateway is still
-     working. Reset the vxlan if this is not the case. This happens, for example, when the gateway POD
-     is restarted and it gets a new IP from K8S.
-     This also now checks to see whether all other containers have completed. In the event that the sidecar
-     is the only remaining container running, it will shutdown. This check is completed using [ok_to_end.py].
-     However, for this to run, we require additional permissions from kube. Namely, those specified in the 
-     SetupEnv.yaml
-     
-     
-     
-- gateway POD:
-   - [gateway_init.sh](bin/gateway_init.sh): creates the VXLAN tunnel and set traffic forwading rules.
-     Optionally, if a VPN is used in the gateway, blocks non VPN outbound traffic.
-   - [gateway_sidecar.sh](bin/gateway_sidecar.sh): deploys a DHCP and DNS server
+In order to deploy this pod gateway, follow the instructions here: https://docs.k8s-at-home.com/guides/pod-gateway/
 
-Settings are expected in the `/config` folder - see examples under [config](config):
-- [config/settings.sh](config/settings.sh): variables used by all helper scripts
-- [config/nat.sh](config/nat.sh): static IP and nat rules for PODs exposing ports through the gateway (and optional VPN) POD
-Default settings might be overwritten by attachin a container volume with the new values to the helper pods.
-
-## Prereqs
-
-You need to create the following secrets (not needed within the k8s-at-home org - there we use org-wide secrets):
-- WORKFLOW_REPO_SYNC_TOKEN # Needed to do PRs that update the workflows
-- GHCR_USERNAME # Needed to upload container to the Github Container Registry
-- GHCR_TOKEN # Needed to upload container to the Github Container Registry
-
-## How to build
-
-1. Build the container
-   ```bash
-   make
-   ```
-
-Testing requires multiple containers - see
-[Helm chart](https://github.com/k8s-at-home/charts/tree/master/charts/stable/pod-gateway-setter)
-and check the [Makefile](Makefile) for other build targets.
+However, when deploying the helm chart, we need to change the image using the following:
+```
+repository: docker.io/danielpayten/vpn-gateway
+```
 
 
